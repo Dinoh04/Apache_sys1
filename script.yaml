@@ -1,0 +1,44 @@
+- name: Automatiser la configuration d'Apache2
+  hosts: all
+  become: yes
+  tasks:
+    - name: Installer Apache2
+      apt:
+        name: apache2
+        state: present
+
+    - name: Copier le fichier domains
+      copy:
+        src: domains
+        dest: /tmp/domains
+
+    - name: Lire le fichier domains
+      shell: cat /tmp/domains
+      register: names_output
+
+    - name: Creer le fichier de  configuration
+      template:
+        src: host.conf
+        dest: "/etc/apache2/sites-available/{{ item }}.conf"
+      loop: "{{ names_output.stdout_lines }}"
+
+    - name: Creation du directories
+      file:
+        path: "/var/www/{{ item }}"
+        state: directory
+      loop: "{{ names_output.stdout_lines }}"
+
+    - name: Creer la page HTML
+      template:
+        src: web.html
+        dest: "/var/www/{{ item }}/index.html"
+      loop: "{{ names_output.stdout_lines }}"
+
+    - name: Activer les configurations
+      command: a2ensite {{ item }}.conf
+      loop: "{{ names_output.stdout_lines }}"
+
+    - name: Redemarrer Apache2
+      service:
+        name: apache2
+        state: restarted
